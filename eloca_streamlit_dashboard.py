@@ -12,8 +12,10 @@ st.title("📊 Dashboard de Relatórios Eloca")
 # Lê variáveis de ambiente (setadas como Secrets no Streamlit Cloud)
 URL = os.getenv("ELOCA_URL")
 HEADERS = {"DeskManager": os.getenv("DESKMANAGER_TOKEN")}
+CSAT_URL = os.getenv("CSAT_URL")
+CSAT_HEADER = {"DeskManager": os.getenv("CSAT_TOKEN")}
 
-@st.cache_data(ttl=3600)  # cache por 1h
+@st.cache_data(ttl=3600)
 def carregar_dados():
     try:
         resposta = requests.get(URL, headers=HEADERS)
@@ -22,14 +24,30 @@ def carregar_dados():
             df = pd.read_excel(excel)
             return df
         else:
-            st.error(f"Erro ao acessar os dados: {resposta.status_code}")
+            st.error(f"Erro ao acessar os dados principais: {resposta.status_code}")
             return pd.DataFrame()
     except Exception as e:
-        st.error(f"Erro: {str(e)}")
+        st.error(f"Erro ao acessar dados principais: {str(e)}")
         return pd.DataFrame()
 
-# Carrega os dados
+@st.cache_data(ttl=3600)
+def carregar_dados_csat():
+    try:
+        resposta = requests.get(CSAT_URL, headers=CSAT_HEADER)
+        if resposta.status_code == 200:
+            excel = BytesIO(resposta.content)
+            df = pd.read_excel(excel)
+            return df
+        else:
+            st.warning(f"Erro ao acessar dados de CSAT: {resposta.status_code}")
+            return pd.DataFrame()
+    except Exception as e:
+        st.warning(f"Erro ao acessar dados de CSAT: {str(e)}")
+        return pd.DataFrame()
+
+# Carrega os dados principais e CSAT
 df = carregar_dados()
+df_csat = carregar_dados_csat()
 
 if not df.empty:
     st.subheader("📄 Tabela de dados")
@@ -78,5 +96,10 @@ if not df.empty:
         st.plotly_chart(fig, use_container_width=True)
     else:
         st.info("Nenhuma coluna numérica encontrada para gerar gráfico adicional.")
+
+# Dados CSAT (visualização básica inicial)
+if not df_csat.empty:
+    st.subheader("📄 Tabela de dados CSAT")
+    st.dataframe(df_csat, use_container_width=True)
 else:
-    st.warning("Nenhum dado disponível. Verifique a URL ou as credenciais.")
+    st.info("Dados de CSAT não carregados ou vazios.")
